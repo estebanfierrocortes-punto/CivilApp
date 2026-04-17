@@ -1,4 +1,3 @@
-google-generativeai
 openai
 streamlit
 Pillow
