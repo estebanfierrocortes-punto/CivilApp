@@ -3,85 +3,77 @@ import google.generativeai as genai
 from PIL import Image
 import io
 
-# Configuración de página con estilo moderno
+# Configuración de página profesional
 st.set_page_config(page_title="CIVIL-OS AI Vision Pro", layout="wide")
 
-# Estilo CSS para mejorar la zona de carga
+# Estilo para que la zona de carga sea atractiva
 st.markdown("""
     <style>
     .stFileUploader {
         border: 2px dashed #4A90E2;
         border-radius: 10px;
-        padding: 20px;
+        background-color: #f0f2f6;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de IA
+# Configuración de IA con tu clave secreta
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("🔑 Falta la API Key en los Secrets de Streamlit.")
+    st.error("🔑 Falta la API Key en los Secrets.")
 
 st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
-st.subheader("Análisis de Planos, Materiales y Mobiliario")
+st.write("---")
 
 with st.sidebar:
     st.header("⚙️ Configuración")
-    modo = st.radio("Módulo Inteligente", ["Lector de Planos y Cantidades", "Cálculos Estructurales"])
+    modo = st.radio("Módulo Inteligente", ["Analizador de Planos", "Cálculos Manuales"])
     st.divider()
-    st.info("💡 Tip: Puedes arrastrar el archivo directamente al cuadro azul o usar el botón para buscarlo.")
+    st.info("💡 Tip: Para pegar una imagen con Ctrl+V, asegúrate de hacer clic primero en el área de carga.")
 
-if modo == "Lector de Planos y Cantidades":
+if modo == "Analizador de Planos":
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.header("📂 Carga de Documento")
-        # El componente de Streamlit permite ARRASTRAR por defecto
-        archivo = st.file_uploader("Arrastra tu plano (PDF, JPG, PNG)", type=['png', 'jpg', 'jpeg', 'pdf'])
+        st.header("📂 Carga de Plano")
         
-        if archivo:
-            if archivo.type == "application/pdf":
-                st.success("📄 PDF cargado. Listo para análisis.")
+        # Este componente ya soporta arrastrar y, en navegadores modernos, 
+        # permite pegar si el cuadro tiene el foco.
+        archivo = st.file_uploader("Arrastra aquí o pega tu imagen (Ctrl+V)", type=['png', 'jpg', 'jpeg', 'pdf'])
+        
+        # OPCIÓN EXTRA: Cámara (por si usas la app en el sitio de obra con el celular)
+        foto_camara = st.camera_input("O toma una foto del plano físico")
+        
+        archivo_final = archivo if archivo else foto_camara
+
+        if archivo_final:
+            if hasattr(archivo_final, 'type') and archivo_final.type == "application/pdf":
+                st.success("📄 PDF detectado.")
             else:
-                imagen = Image.open(archivo)
-                st.image(imagen, caption="Vista previa del plano", use_container_width=True)
+                img_display = Image.open(archivo_final)
+                st.image(img_display, caption="Imagen cargada", use_container_width=True)
 
     with col2:
-        st.header("📊 Parámetros de Análisis")
-        medida_ref = st.number_input("Medida de referencia (metros)", value=1.0, help="Dime cuánto mide una pared conocida para escalar el plano.")
-        tipo_obra = st.selectbox("Tipo de análisis", ["Construcción General", "Estructura de Madera (Framing)", "Ebanistería y Gabinetes", "Remodelación"])
+        st.header("📊 Parámetros de Obra")
+        medida_ref = st.number_input("Medida de referencia (metros)", value=1.0)
+        analisis_tipo = st.selectbox("Especialidad", ["Cómputos Métricos", "Carpintería/Ebanistería", "Estructura"])
         
-        if st.button("🚀 INICIAR ESCANEO IA"):
-            if archivo:
+        if st.button("🚀 ANALIZAR AHORA"):
+            if archivo_final:
                 model = genai.GenerativeModel('gemini-1.5-flash')
-                with st.spinner("Analizando geometrías y detectando materiales..."):
+                with st.spinner("La IA está leyendo el plano..."):
                     try:
-                        if archivo.type == "application/pdf":
-                            contenido = [{"mime_type": "application/pdf", "data": archivo.getvalue()}]
+                        if hasattr(archivo_final, 'type') and archivo_final.type == "application/pdf":
+                            contenido = [{"mime_type": "application/pdf", "data": archivo_final.getvalue()}]
                         else:
-                            contenido = [Image.open(archivo)]
+                            contenido = [Image.open(archivo_final)]
                         
-                        prompt = f"""
-                        Actúa como un Ingeniero Civil y Estimador experto. 
-                        Analiza este archivo de {tipo_obra}.
-                        Usa la medida de referencia de {medida_ref}m para dar estimaciones.
-                        Entrega:
-                        1. Tabla de Cómputos Métricos (Áreas, Muros, Perímetros).
-                        2. Lista de Materiales estimados (Madera, Placas, Herrajes si aplica).
-                        3. Observaciones técnicas según normas de construcción.
-                        Responde siempre en español.
-                        """
-                        
+                        prompt = f"Analiza este plano de {analisis_tipo}. La escala es {medida_ref}m. Dame una tabla de materiales y m2."
                         response = model.generate_content([prompt] + contenido)
-                        st.markdown("---")
-                        st.success("✅ Análisis Finalizado")
+                        st.markdown("### 📋 Resultados del Escaneo")
                         st.markdown(response.text)
                     except Exception as e:
                         st.error(f"Error: {e}")
             else:
-                st.warning("Primero debes subir o arrastrar un archivo.")
-
-elif modo == "Cálculos Estructurales":
-    st.header("📊 Ingeniería de Precisión")
-    st.write("Módulo de cálculos manuales activo.")
+                st.warning("No hay imagen para analizar.")
