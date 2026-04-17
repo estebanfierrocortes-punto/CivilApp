@@ -3,73 +3,78 @@ import google.generativeai as genai
 from PIL import Image
 from streamlit_paste_button import paste_image_button as pbutton
 
-st.set_page_config(page_title="CIVIL-OS AI Chat", layout="wide")
+# Configuración básica de la página
+st.set_page_config(page_title="CIVIL-OS AI", layout="wide")
 
-# Configuración visual
+# Estilo para botones y fondos
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { border-radius: 20px; width: 100%; height: 50px; font-weight: bold; background-color: #2E7D32; color: white; }
+    .stButton>button { border-radius: 10px; width: 100%; height: 50px; background-color: #1E88E5; color: white; font-weight: bold; }
+    .main { background-color: #f0f2f6; }
     </style>
     """, unsafe_allow_html=True)
 
-# Verificación de la Clave API
+# Conexión con la llave API
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("🔑 No se encontró la clave API en los Secrets.")
+    st.error("🔑 Error: No se encuentra la API Key en los Secrets.")
 
-st.title("🏗️ CIVIL-OS: Análisis de Obra")
+st.title("🏗️ CIVIL-OS: Control de Producción")
 
+# Panel lateral de ajustes
 with st.sidebar:
-    st.header("⚙️ Ajustes")
-    medida_ref = st.number_input("Escala (metros)", value=1.0)
-    tipo = st.selectbox("Especialidad", ["Ebanistería/Cocinas", "Construcción General", "Estructuras"])
+    st.header("⚙️ Ajustes de Obra")
+    medida_ref = st.number_input("Escala (m)", value=1.0)
+    especialidad = st.selectbox("Área", ["Ebanistería/Muebles", "Construcción General", "Instalaciones"])
 
+# Entradas de usuario
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("📋 Opción 1: Pegar")
-    paste_result = pbutton("Haga clic y presione Ctrl+V")
+    st.subheader("📋 Pegar Pantallazo")
+    resultado_pegar = pbutton("Haga clic y presione Ctrl+V")
 with col2:
-    st.subheader("📂 Opción 2: Subir")
-    archivo = st.file_uploader("Subir imagen o PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
+    st.subheader("📂 Cargar Archivo")
+    archivo_cargado = st.file_uploader("Subir imagen o PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
 
-input_final = None
+# Lógica para seleccionar el plano
+plano_final = None
 es_pdf = False
 
-if paste_result.image_data is not None:
-    input_final = paste_result.image_data
-    st.image(input_final, caption="Imagen para procesar", width=400)
-elif archivo is not None:
-    if archivo.type == "application/pdf":
-        input_final = archivo.getvalue()
+if resultado_pegar.image_data is not None:
+    plano_final = resultado_pegar.image_data
+    st.image(plano_final, caption="Plano detectado (Pegado)", width=450)
+elif archivo_cargado is not None:
+    if archivo_cargado.type == "application/pdf":
+        plano_final = archivo_cargado.getvalue()
         es_pdf = True
-        st.success("✅ PDF listo")
+        st.success("✅ PDF cargado.")
     else:
-        input_final = Image.open(archivo)
-        st.image(input_final, caption="Archivo listo", width=400)
+        plano_final = Image.open(archivo_cargado)
+        st.image(plano_final, caption="Plano detectado (Cargado)", width=450)
 
-if input_final:
-    if st.button("🚀 GENERAR CÓMPUTOS MÉTRICOS"):
-        # USAMOS EL NOMBRE MÁS CORTO Y ESTABLE DEL MODELO
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        with st.spinner("La IA está leyendo el plano..."):
-            try:
+# Botón de proceso
+if plano_final:
+    if st.button("🚀 GENERAR LISTADO DE MATERIALES"):
+        try:
+            # CAMBIO CRÍTICO: Usamos la versión más simple del comando
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            with st.spinner("Analizando piezas y medidas..."):
                 if es_pdf:
-                    contenido = [{"mime_type": "application/pdf", "data": input_final}]
+                    contenido = [{"mime_type": "application/pdf", "data": plano_final}]
                 else:
-                    contenido = [input_final]
+                    contenido = [plano_final]
                 
-                prompt = f"Eres un Production Manager experto en {tipo}. Basado en la escala de {medida_ref}m, genera una tabla detallada de piezas y materiales."
+                instruccion = f"Actúa como un Foreman experto en {especialidad}. Escala: {medida_ref}m. Genera una tabla técnica de materiales, m2 y cantidades."
                 
-                # Llamada directa sin configuraciones adicionales de versión
-                response = model.generate_content([prompt] + contenido)
+                # Ejecución del análisis
+                respuesta = model.generate_content([instruccion] + contenido)
                 
                 st.markdown("---")
                 st.subheader("📋 Resultados del Análisis")
-                st.write(response.text)
+                st.write(respuesta.text)
                 
-            except Exception as e:
-                st.error(f"Error de comunicación: {e}")
-                st.warning("⚠️ Si el error persiste, intenta generar una NUEVA API Key en Google AI Studio.")
+        except Exception as e:
+            st.error(f"❌ Error de sistema: {e}")
+            st.info("💡 Si el error persiste, por favor crea una llave (API Key) nueva en Google AI Studio.")
