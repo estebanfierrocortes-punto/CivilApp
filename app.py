@@ -1,34 +1,47 @@
 import streamlit as st
-import pandas as pd
+import math
 
-st.set_page_config(page_title="CIVIL-OS Sherbrooke", layout="wide")
+st.set_page_config(page_title="CIVIL-OS Pro", layout="wide")
 
-st.title("🏗️ CIVIL-OS: Gestión de Obra")
+st.title("🏗️ CIVIL-OS: Motor de Cálculo de Ingeniería")
 st.sidebar.header("Menú de Control")
 
-opcion = st.sidebar.selectbox("Selecciona un Módulo", ["Inventario y Costos", "Registro de Avance", "Normativa RBQ"])
+opcion = st.sidebar.selectbox("Selecciona un Módulo", ["Calculadora de Materiales", "Reporte de Obra", "Normativa"])
 
-if opcion == "Inventario y Costos":
-    st.header("📊 Calculadora de Materiales y Presupuesto")
+if opcion == "Calculadora de Materiales":
+    st.header("📊 Cómputos Métricos Inteligentes")
     
-    material = st.selectbox("Material", ["Madera (2x4x8)", "Concreto (m3)", "Gyproc (Hoja)", "Clavos (kg)"])
-    cantidad = st.number_input("Cantidad Necesaria", min_value=1)
-    precio_unitario = st.number_input("Precio Unitario ($)", min_value=0.0)
+    tipo_obra = st.radio("¿Qué vas a calcular?", ["Paredes de Madera (Framing)", "Vaciado de Concreto (Losa/Zapata)"])
     
-    if st.button("Calcular y Guardar"):
-        total = cantidad * precio_unitario
-        st.success(f"Total estimado para {material}: ${total:,.2f}")
+    if tipo_obra == "Paredes de Madera (Framing)":
+        st.subheader("Cálculo de Estructura (Studs)")
+        largo = st.number_input("Largo de la pared (pies)", min_value=1.0)
+        alto = st.number_input("Alto de la pared (pies)", min_value=1.0)
+        espaciado = st.selectbox("Espaciado entre postes (pulgadas OC)", [16, 24])
+        
+        if st.button("Calcular Madera"):
+            # Lógica: (Largo * 12 / espaciado) + 1 para el final + soleras (placas)
+            num_studs = math.ceil((largo * 12) / espaciado) + 1
+            soleras = math.ceil(largo / 8) * 3 
+            
+            st.success(f"Resultados para pared de {largo}' x {alto}':")
+            st.write(f"- **Postes (Studs) necesarios:** {num_studs} piezas.")
+            st.write(f"- **Madera para soleras (8 pies):** {soleras} piezas.")
+            st.write(f"- **Hojas de Gyproc (4x8):** {math.ceil((largo * alto) / 32)} hojas por una cara.")
 
-elif opcion == "Registro de Avance":
-    st.header("📸 Reporte de Campo")
-    st.write("Sube una foto del avance hoy:")
-    foto = st.file_uploader("Capturar foto", type=['png', 'jpg', 'jpeg'])
-    notas = st.text_area("Notas del capataz")
-    if st.button("Enviar Reporte"):
-        st.info("Reporte guardado con éxito.")
+    elif tipo_obra == "Vaciado de Concreto (Losa/Zapata)":
+        st.subheader("Cálculo de Volumen de Mezcla")
+        ancho = st.number_input("Ancho (metros)", min_value=0.1)
+        largo_c = st.number_input("Largo (metros)", min_value=0.1)
+        espesor = st.number_input("Espesor/Profundidad (centímetros)", min_value=1.0)
+        
+        if st.button("Calcular Concreto"):
+            volumen = (ancho * largo_c * (espesor / 100))
+            total_con_desperdicio = volumen * 1.10
+            st.success(f"Volumen neto: {volumen:.2f} m³")
+            st.info(f"Sugerido pedir (10% desperdicio): **{total_con_desperdicio:.2f} m³**")
 
-elif opcion == "Normativa RBQ":
-    st.header("📜 Consulta Técnica")
-    st.write("Escribe tu duda sobre el código de construcción:")
-    pregunta = st.text_input("Ej: Distancia mínima de seguridad eléctrica")
-    st.warning("IA conectada: El sistema de consulta reglamentaria está activo.")
+elif opcion == "Reporte de Obra":
+    st.header("📸 Registro de Avance")
+    foto = st.file_uploader("Capturar avance")
+    if foto: st.image(foto)
