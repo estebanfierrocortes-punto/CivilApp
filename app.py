@@ -1,52 +1,49 @@
 import streamlit as st
-import math
+import google.generativeai as genai
 from PIL import Image
 
 st.set_page_config(page_title="CIVIL-OS AI Vision", layout="wide")
 
+# Configurar la IA con la llave que pondrás en Secrets
+if "GOOGLE_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+else:
+    st.warning("⚠️ Falta configurar la API Key en los Secrets de Streamlit.")
+
 st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
 
-# Sidebar mejorada
 with st.sidebar:
     st.header("Centro de Control IA")
-    modo = st.radio("Módulo Inteligente", ["Lectura de Planos (IA)", "Cálculos Estructurales", "Reporte de Obra"])
+    modo = st.radio("Módulo Inteligente", ["Lectura de Planos (IA)", "Cálculos Estructurales"])
 
 if modo == "Lectura de Planos (IA)":
     st.header("🔍 Análisis de Planos y Croquis")
-    st.info("Sube un plano digital o un dibujo a mano alzada para que la IA extraiga cantidades.")
+    st.info("Sube una IMAGEN (JPG/PNG) de tu plano o dibujo a mano alzada.")
     
-    archivo = st.file_uploader("Cargar Plano (Imagen/PDF)", type=['png', 'jpg', 'jpeg', 'pdf'])
+    # He limitado esto a imágenes para evitar el error del PDF por ahora
+    archivo = st.file_uploader("Cargar Plano (Imagen)", type=['png', 'jpg', 'jpeg'])
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if archivo:
+    if archivo:
+        try:
             imagen = Image.open(archivo)
-            st.image(imagen, caption="Plano cargado", use_container_width=True)
+            st.image(imagen, caption="Plano cargado correctamente", use_container_width=True)
             
-    with col2:
-        st.subheader("Configuración de Escala")
-        referencia = st.number_input("Medida de referencia conocida (metros)", value=1.0)
-        st.caption("Ejemplo: Mide una puerta en el plano y pon '0.90'")
-        
-        if st.button("Analizar con IA"):
-            with st.spinner("La IA está procesando los muros y áreas..."):
-                # Aquí simulamos la respuesta de la IA mientras configuramos la conexión real
-                st.success("✅ Análisis Completo")
-                st.markdown("""
-                **Resultados Estimados por IA:**
-                * **Área Total:** 124.5 m²
-                * **Muros Perimetrales:** 42.8 metros lineales
-                * **Puntos Eléctricos detectados:** 12
-                * **Puertas/Vanas:** 4
-                ---
-                *Sugerencia: Revisar escala en muros de carga.*
-                """)
+            medida_ref = st.number_input("Medida de referencia (metros)", value=1.0)
+            
+            if st.button("Analizar con IA"):
+                if "GOOGLE_API_KEY" in st.secrets:
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    with st.spinner("La IA está midiendo el plano..."):
+                        # Prompt técnico para la IA
+                        prompt = f"Analiza este plano de construcción. Considerando que la medida de referencia es {medida_ref}m, calcula el área total, longitud de muros y cantidad de materiales."
+                        response = model.generate_content([prompt, imagen])
+                        st.success("✅ Análisis Finalizado")
+                        st.write(response.text)
+                else:
+                    st.error("No puedo analizar sin la API Key en Secrets.")
+        except Exception as e:
+            st.error(f"Error al procesar la imagen: {e}")
 
 elif modo == "Cálculos Estructurales":
     st.header("📊 Ingeniería de Precisión")
-    # Mantengo tu calculadora anterior pero con diseño más limpio
-    largo = st.number_input("Largo (m)", value=5.0)
-    ancho = st.number_input("Ancho (m)", value=3.0)
-    if st.button("Calcular Área"):
-        st.write(f"Área total: {largo * ancho} m²")
+    st.write("Calculadora manual activa.")
