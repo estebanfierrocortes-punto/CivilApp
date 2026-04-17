@@ -1,3 +1,4 @@
 google-generativeai
-streamlit-paste-button
+streamlit
 Pillow
+streamlit-paste-button
