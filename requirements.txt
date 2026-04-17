@@ -1,4 +1,5 @@
 google-generativeai
+openai
 streamlit
 Pillow
 streamlit-paste-button
