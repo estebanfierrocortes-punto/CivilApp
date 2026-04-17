@@ -5,7 +5,7 @@ from streamlit_paste_button import paste_image_button as pbutton
 
 st.set_page_config(page_title="CIVIL-OS AI Chat", layout="wide")
 
-# Diseño profesional
+# Estética de la aplicación
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -13,11 +13,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de IA
+# Configuración segura de la API
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("🔑 Falta la API Key en los Secrets.")
+    st.error("🔑 Falta la API Key en los Secrets de Streamlit.")
 
 st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
 
@@ -26,7 +26,7 @@ with st.sidebar:
     medida_ref = st.number_input("Medida de referencia (m)", value=1.0)
     tipo = st.selectbox("Especialidad", ["Ebanistería/Armarios", "Estructura Madera", "Construcción General"])
 
-# --- ZONA DE ENTRADA ---
+# --- DOBLE ENTRADA (PEGAR Y SUBIR) ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -37,49 +37,55 @@ with col2:
     st.subheader("📁 Opción 2: Subir")
     archivo_subido = st.file_uploader("Arrastra PDF o Imagen", type=['png', 'jpg', 'jpeg', 'pdf'])
 
-# --- LÓGICA DE DETECCIÓN ---
-imagen_para_ia = None
-pdf_para_ia = None
+# --- GESTIÓN DE CONTENIDO ---
+imagen_lista = None
+pdf_datos = None
 
 if paste_result.image_data is not None:
-    imagen_para_ia = paste_result.image_data
-    st.image(imagen_para_ia, caption="Imagen pegada correctamente", width=400)
+    imagen_lista = paste_result.image_data
+    st.image(imagen_lista, caption="Imagen pegada lista", width=400)
 
 elif archivo_subido is not None:
     if archivo_subido.type == "application/pdf":
-        pdf_para_ia = archivo_subido.getvalue()
-        st.success("✅ PDF listo para análisis")
+        pdf_datos = archivo_subido.getvalue()
+        st.success("✅ PDF cargado correctamente")
     else:
-        imagen_para_ia = Image.open(archivo_subido)
-        st.image(imagen_para_ia, caption="Imagen cargada correctamente", width=400)
+        imagen_lista = Image.open(archivo_subido)
+        st.image(imagen_lista, caption="Imagen cargada lista", width=400)
 
-# --- BOTÓN DE ACCIÓN ---
-if imagen_para_ia or pdf_para_ia:
+# --- ANÁLISIS ---
+if imagen_lista or pdf_datos:
     if st.button("🚀 INICIAR ANÁLISIS PROFESIONAL"):
-        # CAMBIO CLAVE AQUÍ: Usamos el nombre base del modelo
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
-        with st.spinner("La IA está calculando materiales y medidas..."):
-            try:
-                # Preparamos el contenido
-                if pdf_para_ia:
-                    contenido = [{"mime_type": "application/pdf", "data": pdf_para_ia}]
+        # USAMOS EL MODELO SIN PREFIJOS COMPLICADOS PARA EVITAR EL ERROR 404
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            with st.spinner("La IA está calculando materiales para la obra..."):
+                # Preparamos el mensaje
+                if pdf_datos:
+                    contenido = [{"mime_type": "application/pdf", "data": pdf_datos}]
                 else:
-                    contenido = [imagen_para_ia]
+                    contenido = [imagen_lista]
                 
                 prompt = f"""
-                Actúa como un Foreman e Ingeniero experto en {tipo}.
-                Usando la referencia de {medida_ref} metros en el plano:
-                1. Genera una TABLA de materiales necesarios.
-                2. Calcula metros cuadrados de áreas principales.
-                3. Estima cantidades (piezas de madera, hojas de gyproc, o herrajes).
-                Responde en español de forma técnica y precisa.
+                Actúa como un Foreman e Ingeniero civil experto en {tipo}.
+                Referencia de escala: {medida_ref} metros.
+                1. Extrae una tabla detallada de materiales.
+                2. Calcula m2 de superficies visibles.
+                3. Proporciona un desglose de cantidades para fabricación/compra.
+                Responde de forma técnica en español.
                 """
                 
+                # Forzamos a la IA a responder
                 response = model.generate_content([prompt] + contenido)
+                
                 st.markdown("---")
-                st.markdown("### 📋 Resultados del Análisis de Obra")
+                st.subheader("📋 Resultados del Análisis")
                 st.markdown(response.text)
-            except Exception as e:
-                st.error(f"Error técnico al analizar: {e}")
+                
+        except Exception as e:
+            # Si el error persiste, mostramos un mensaje más amigable
+            st.error(f"Hubo un problema de conexión con la IA. Detalle: {e}")
+            st.info("💡 Consejo: Asegúrate de que tu API Key en 'Secrets' sea la misma que creaste el 17 de abril.")
 else:
     st.info("💡 Esperando plano... Pega un pantallazo o sube un archivo para comenzar.")
