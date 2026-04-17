@@ -5,87 +5,71 @@ from streamlit_paste_button import paste_image_button as pbutton
 
 st.set_page_config(page_title="CIVIL-OS AI Chat", layout="wide")
 
-# Estética de la aplicación
+# Configuración visual
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stButton>button { border-radius: 20px; width: 100%; height: 50px; font-weight: bold; background-color: #4A90E2; color: white; }
+    .stButton>button { border-radius: 20px; width: 100%; height: 50px; font-weight: bold; background-color: #2E7D32; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración segura de la API
+# Verificación de la Clave API
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("🔑 Falta la API Key en los Secrets de Streamlit.")
+    st.error("🔑 No se encontró la clave API en los Secrets.")
 
-st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
+st.title("🏗️ CIVIL-OS: Análisis de Obra")
 
 with st.sidebar:
-    st.header("⚙️ Configuración")
-    medida_ref = st.number_input("Medida de referencia (m)", value=1.0)
-    tipo = st.selectbox("Especialidad", ["Ebanistería/Armarios", "Estructura Madera", "Construcción General"])
+    st.header("⚙️ Ajustes")
+    medida_ref = st.number_input("Escala (metros)", value=1.0)
+    tipo = st.selectbox("Especialidad", ["Ebanistería/Cocinas", "Construcción General", "Estructuras"])
 
-# --- DOBLE ENTRADA (PEGAR Y SUBIR) ---
 col1, col2 = st.columns(2)
-
 with col1:
-    st.subheader("💬 Opción 1: Pegar")
-    paste_result = pbutton("📋 CLIC AQUÍ Y PEGA (Ctrl+V)")
-
+    st.subheader("📋 Opción 1: Pegar")
+    paste_result = pbutton("Haga clic y presione Ctrl+V")
 with col2:
-    st.subheader("📁 Opción 2: Subir")
-    archivo_subido = st.file_uploader("Arrastra PDF o Imagen", type=['png', 'jpg', 'jpeg', 'pdf'])
+    st.subheader("📂 Opción 2: Subir")
+    archivo = st.file_uploader("Subir imagen o PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
 
-# --- GESTIÓN DE CONTENIDO ---
-imagen_lista = None
-pdf_datos = None
+input_final = None
+es_pdf = False
 
 if paste_result.image_data is not None:
-    imagen_lista = paste_result.image_data
-    st.image(imagen_lista, caption="Imagen pegada lista", width=400)
-
-elif archivo_subido is not None:
-    if archivo_subido.type == "application/pdf":
-        pdf_datos = archivo_subido.getvalue()
-        st.success("✅ PDF cargado correctamente")
+    input_final = paste_result.image_data
+    st.image(input_final, caption="Imagen para procesar", width=400)
+elif archivo is not None:
+    if archivo.type == "application/pdf":
+        input_final = archivo.getvalue()
+        es_pdf = True
+        st.success("✅ PDF listo")
     else:
-        imagen_lista = Image.open(archivo_subido)
-        st.image(imagen_lista, caption="Imagen cargada lista", width=400)
+        input_final = Image.open(archivo)
+        st.image(input_final, caption="Archivo listo", width=400)
 
-# --- ANÁLISIS ---
-if imagen_lista or pdf_datos:
-    if st.button("🚀 INICIAR ANÁLISIS PROFESIONAL"):
-        # USAMOS EL MODELO SIN PREFIJOS COMPLICADOS PARA EVITAR EL ERROR 404
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            with st.spinner("La IA está calculando materiales para la obra..."):
-                # Preparamos el mensaje
-                if pdf_datos:
-                    contenido = [{"mime_type": "application/pdf", "data": pdf_datos}]
+if input_final:
+    if st.button("🚀 GENERAR CÓMPUTOS MÉTRICOS"):
+        # USAMOS EL NOMBRE MÁS CORTO Y ESTABLE DEL MODELO
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        with st.spinner("La IA está leyendo el plano..."):
+            try:
+                if es_pdf:
+                    contenido = [{"mime_type": "application/pdf", "data": input_final}]
                 else:
-                    contenido = [imagen_lista]
+                    contenido = [input_final]
                 
-                prompt = f"""
-                Actúa como un Foreman e Ingeniero civil experto en {tipo}.
-                Referencia de escala: {medida_ref} metros.
-                1. Extrae una tabla detallada de materiales.
-                2. Calcula m2 de superficies visibles.
-                3. Proporciona un desglose de cantidades para fabricación/compra.
-                Responde de forma técnica en español.
-                """
+                prompt = f"Eres un Production Manager experto en {tipo}. Basado en la escala de {medida_ref}m, genera una tabla detallada de piezas y materiales."
                 
-                # Forzamos a la IA a responder
+                # Llamada directa sin configuraciones adicionales de versión
                 response = model.generate_content([prompt] + contenido)
                 
                 st.markdown("---")
                 st.subheader("📋 Resultados del Análisis")
-                st.markdown(response.text)
+                st.write(response.text)
                 
-        except Exception as e:
-            # Si el error persiste, mostramos un mensaje más amigable
-            st.error(f"Hubo un problema de conexión con la IA. Detalle: {e}")
-            st.info("💡 Consejo: Asegúrate de que tu API Key en 'Secrets' sea la misma que creaste el 17 de abril.")
-else:
-    st.info("💡 Esperando plano... Pega un pantallazo o sube un archivo para comenzar.")
+            except Exception as e:
+                st.error(f"Error de comunicación: {e}")
+                st.warning("⚠️ Si el error persiste, intenta generar una NUEVA API Key en Google AI Studio.")
