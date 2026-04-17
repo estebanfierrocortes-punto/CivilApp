@@ -3,77 +3,69 @@ import google.generativeai as genai
 from PIL import Image
 import io
 
-# Configuración de página profesional
-st.set_page_config(page_title="CIVIL-OS AI Vision Pro", layout="wide")
+st.set_page_config(page_title="CIVIL-OS AI Chat Vision", layout="wide")
 
-# Estilo para que la zona de carga sea atractiva
+# Estilo para que parezca una interfaz de chat/mensajería
 st.markdown("""
     <style>
-    .stFileUploader {
-        border: 2px dashed #4A90E2;
-        border-radius: 10px;
-        background-color: #f0f2f6;
+    .stTextInput > div > div > input {
+        border: 2px solid #4A90E2 !important;
+        padding: 15px !important;
+        border-radius: 25px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de IA con tu clave secreta
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
     st.error("🔑 Falta la API Key en los Secrets.")
 
 st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
-st.write("---")
 
 with st.sidebar:
     st.header("⚙️ Configuración")
-    modo = st.radio("Módulo Inteligente", ["Analizador de Planos", "Cálculos Manuales"])
-    st.divider()
-    st.info("💡 Tip: Para pegar una imagen con Ctrl+V, asegúrate de hacer clic primero en el área de carga.")
+    modo = st.radio("Módulo", ["Chat con Planos", "Cálculos"])
+    st.info("💡 Para pegar: Haz clic en la barra de abajo y presiona Ctrl+V.")
 
-if modo == "Analizador de Planos":
-    col1, col2 = st.columns([1, 1])
+if modo == "Chat con Planos":
+    # 1. EL "RECEPTOR DE PEGADO" (Simula la línea de chat)
+    st.header("💬 Línea de Entrada de Planos")
     
+    # Usamos un file_uploader pero con diseño más compacto que acepta pegar
+    input_pegar = st.file_uploader("Haz clic aquí y presiona CTRL+V para pegar tu plano o captura", type=['png', 'jpg', 'jpeg', 'pdf'])
+    
+    # 2. PARÁMETROS RÁPIDOS
+    col1, col2 = st.columns(2)
     with col1:
-        st.header("📂 Carga de Plano")
-        
-        # Este componente ya soporta arrastrar y, en navegadores modernos, 
-        # permite pegar si el cuadro tiene el foco.
-        archivo = st.file_uploader("Arrastra aquí o pega tu imagen (Ctrl+V)", type=['png', 'jpg', 'jpeg', 'pdf'])
-        
-        # OPCIÓN EXTRA: Cámara (por si usas la app en el sitio de obra con el celular)
-        foto_camara = st.camera_input("O toma una foto del plano físico")
-        
-        archivo_final = archivo if archivo else foto_camara
-
-        if archivo_final:
-            if hasattr(archivo_final, 'type') and archivo_final.type == "application/pdf":
-                st.success("📄 PDF detectado.")
-            else:
-                img_display = Image.open(archivo_final)
-                st.image(img_display, caption="Imagen cargada", use_container_width=True)
-
+        medida = st.number_input("Medida de referencia (m)", value=1.0)
     with col2:
-        st.header("📊 Parámetros de Obra")
-        medida_ref = st.number_input("Medida de referencia (metros)", value=1.0)
-        analisis_tipo = st.selectbox("Especialidad", ["Cómputos Métricos", "Carpintería/Ebanistería", "Estructura"])
+        tipo = st.selectbox("Analizar como:", ["Ebanistería/Gabinetes", "Estructura Madera", "Plano General"])
+
+    # 3. ACCIÓN
+    if input_pegar:
+        st.image(input_pegar, caption="Plano listo para analizar", width=400)
         
         if st.button("🚀 ANALIZAR AHORA"):
-            if archivo_final:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                with st.spinner("La IA está leyendo el plano..."):
-                    try:
-                        if hasattr(archivo_final, 'type') and archivo_final.type == "application/pdf":
-                            contenido = [{"mime_type": "application/pdf", "data": archivo_final.getvalue()}]
-                        else:
-                            contenido = [Image.open(archivo_final)]
-                        
-                        prompt = f"Analiza este plano de {analisis_tipo}. La escala es {medida_ref}m. Dame una tabla de materiales y m2."
-                        response = model.generate_content([prompt] + contenido)
-                        st.markdown("### 📋 Resultados del Escaneo")
-                        st.markdown(response.text)
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-            else:
-                st.warning("No hay imagen para analizar.")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            with st.spinner("Leyendo como un ingeniero..."):
+                try:
+                    # Preparar contenido
+                    if input_pegar.type == "application/pdf":
+                        contenido = [{"mime_type": "application/pdf", "data": input_pegar.getvalue()}]
+                    else:
+                        contenido = [Image.open(input_pegar)]
+                    
+                    prompt = f"Actúa como un experto en {tipo}. Escala: {medida}m. Dame una tabla de materiales y cantidades."
+                    response = model.generate_content([prompt] + contenido)
+                    
+                    st.markdown("### 📋 Resultados del Análisis")
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Error técnico: {e}")
+    else:
+        st.write("---")
+        st.caption("Esperando plano... Pega una imagen arriba para comenzar.")
+
+elif modo == "Cálculos":
+    st.write("Módulo de cálculos manuales.")
