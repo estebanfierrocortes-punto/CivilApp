@@ -1,58 +1,73 @@
 import streamlit as st
-import google.generativeai as genai
+from openai import OpenAI
 from PIL import Image
 import io
+import base64
 
-# 1. CONFIGURACIÓN DE PÁGINA
-st.set_page_config(page_title="CIVIL-OS ESTABLE", layout="wide")
-st.title("🏗️ CIVIL-OS: Control de Producción")
+# 1. CONFIGURACIÓN Y CONEXIÓN
+st.set_page_config(page_title="CIVIL-OS PRO (OpenAI)", layout="wide")
+st.title("🏗️ CIVIL-OS: Análisis de Producción con GPT-4o")
 
-# 2. CONEXIÓN DIRECTA (Solución al Error 404)
-if "GOOGLE_API_KEY" in st.secrets:
-    # Usamos la configuración más simple posible para evitar errores de versión
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# Conectamos con OpenAI usando su clave de los Secrets
+if "OPENAI_API_KEY" in st.secrets:
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 else:
-    st.error("Falta la clave GOOGLE_API_KEY en los Secrets de Streamlit.")
+    st.error("🔑 Error: No se encontró la clave 'OPENAI_API_KEY' en los Secrets de Streamlit.")
+    st.stop()
 
-# 3. INTERFAZ DE USUARIO
+# 2. PANEL DE CONTROL
 with st.sidebar:
-    st.header("⚙️ Ajustes")
-    modo = st.radio("Acción:", ["Analizar Plano", "Generar desde Texto"])
-    especialidad = st.selectbox("Área:", ["Ebanistería/Cocinas", "Construcción"])
+    st.header("⚙️ Ajustes de Fábrica")
+    especialidad = st.selectbox("Especialidad", ["Ebanistería/Armarios", "Obra Civil", "Cocinas"])
+    medida_ref = st.number_input("Escala de referencia (m)", value=1.0)
 
-# 4. LÓGICA DE TRABAJO
-if modo == "Analizar Plano":
-    archivo = st.file_uploader("Subir imagen del plano", type=['png', 'jpg', 'jpeg'])
+# 3. CARGA DE PLANOS
+archivo = st.file_uploader("Subir imagen del plano (PNG, JPG)", type=['png', 'jpg', 'jpeg'])
+
+if archivo:
+    # Mostramos la imagen para confirmar
+    imagen_pil = Image.open(archivo)
+    st.image(imagen_pil, caption="Plano cargado para análisis", width=800)
     
-    if archivo:
-        img = Image.open(archivo)
-        st.image(img, caption="Plano cargado", width=600)
-        
-        if st.button("🚀 INICIAR ANÁLISIS"):
-            try:
-                # Forzamos el uso del modelo flash más reciente sin prefijos beta
-                model = genai.GenerativeModel('gemini-1.5-flash')
+    if st.button("🚀 INICIAR ANÁLISIS PROFESIONAL"):
+        try:
+            with st.spinner("ChatGPT analizando el plano..."):
+                # Convertimos la imagen a base64 para que OpenAI la pueda leer
+                buffered = io.BytesIO()
+                imagen_pil.save(buffered, format="PNG")
+                img_str = base64.b64encode(buffered.getvalue()).decode()
                 
-                with st.spinner("Analizando..."):
-                    prompt = f"Como Production Manager en {especialidad}, extrae una tabla de piezas, medidas y materiales de este plano."
-                    response = model.generate_content([prompt, img])
-                    
-                    st.success("✅ Análisis Completo")
-                    st.markdown(response.text)
-            except Exception as e:
-                st.error(f"Error de conexión: {e}")
-                st.info("Si el error persiste, verifique que la clave en Secrets no tenga espacios en blanco.")
+                # Preparamos el mensaje para GPT-4o
+                prompt = (f"Actúa como Production Manager experto en {especialidad}. "
+                         f"Analiza este plano considerando una escala de {medida_ref}m. "
+                         "Extrae una tabla técnica de producción que incluya: "
+                         "1. Identificación de la pieza o ambiente. "
+                         "2. Medidas estimadas (Largo x Ancho). "
+                         "3. Materiales sugeridos para fabricación.")
 
-else:
-    # MODO TEXTO
-    descripcion = st.text_area("Describa el proyecto (ej. Cocina de 3x4m con armarios en MDF):", height=200)
-    if st.button("🚀 GENERAR DESPIECE"):
-        if descripcion:
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                with st.spinner("Generando..."):
-                    prompt_txt = f"Genera una tabla técnica de producción para {especialidad} basada en: {descripcion}"
-                    response = model.generate_content(prompt_txt)
-                    st.markdown(response.text)
-            except Exception as e:
-                st.error(f"Error: {e}")
+                # Llamada al motor de OpenAI
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/png;base64,{img_str}"}
+                                },
+                            ],
+                        }
+                    ],
+                    max_tokens=1000,
+                )
+                
+                # Resultado
+                st.success("✅ Análisis de OpenAI Completo")
+                st.markdown("### 📊 Reporte de Producción")
+                st.markdown(response.choices[0].message.content)
+
+        except Exception as e:
+            st.error(f"Error técnico con OpenAI: {e}")
+            st.info("Verifique que su cuenta de OpenAI tenga créditos activos.")
