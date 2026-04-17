@@ -3,54 +3,61 @@ import google.generativeai as genai
 from PIL import Image
 from streamlit_paste_button import paste_image_button as pbutton
 
-# Configuración básica
+# Configuración de la interfaz
 st.set_page_config(page_title="CIVIL-OS FREE", layout="wide")
-st.title("🏗️ CIVIL-OS: Análisis de Producción (Gratis)")
+st.title("🏗️ CIVIL-OS: Análisis de Producción Gratuito")
 
-# Conexión Directa y Forzada
+# Conexión Segura con Google
 if "GOOGLE_API_KEY" in st.secrets:
-    # Esta línea es la que evita el error 404 al no definir versiones externas
+    # Forzamos la configuración básica para evitar el error v1beta
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("🔑 Falta la clave en Secrets.")
+    st.error("🔑 Error: No se encontró la clave GOOGLE_API_KEY en los Secrets.")
     st.stop()
 
-# Interfaz simplificada
+# Menú lateral
 with st.sidebar:
-    especialidad = st.selectbox("Especialidad", ["Ebanistería/Armarios", "Obra Civil"])
+    st.header("⚙️ Ajustes")
+    especialidad = st.selectbox("Especialidad", ["Ebanistería/Armarios", "Obra Civil", "Cocinas"])
     medida_ref = st.number_input("Escala (m)", value=1.0)
 
-# Carga de archivos
-st.subheader("📸 Cargue su plano")
+# Carga de Planos
+st.divider()
 col1, col2 = st.columns(2)
 archivo_final = None
 
 with col1:
-    btn_pegar = pbutton("Clic aquí y Ctrl+V")
+    st.subheader("📋 Opción 1: Pegar")
+    btn_pegar = pbutton("Haga clic y presione Ctrl+V")
     if btn_pegar.image_data is not None:
         archivo_final = btn_pegar.image_data
 
 with col2:
-    subido = st.file_uploader("O suba una imagen", type=['png', 'jpg', 'jpeg'])
+    st.subheader("📂 Opción 2: Subir")
+    subido = st.file_uploader("Subir imagen del plano", type=['png', 'jpg', 'jpeg'])
     if subido:
         archivo_final = Image.open(subido)
 
+# Procesamiento del Análisis
 if archivo_final:
-    st.image(archivo_final, width=700)
+    st.image(archivo_final, caption="Plano cargado correctamente", width=750)
     
-    if st.button("🚀 INICIAR ANÁLISIS GRATUITO"):
+    if st.button("🚀 GENERAR LISTA DE PIEZAS (GRATIS)"):
         try:
-            # Usamos el nombre del modelo sin sufijos extras
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            prompt = (f"Actúa como Production Manager en {especialidad}. Escala: {medida_ref}m. "
-                     "Extrae una tabla con: Pieza, Medidas y Material sugerido.")
-            
-            # Procesamiento
-            with st.spinner("Analizando plano..."):
-                response = model.generate_content([prompt, archivo_final])
-                st.success("Análisis terminado")
+            with st.spinner("Analizando con Google Gemini..."):
+                # Usamos el modelo 'gemini-1.5-flash' que es gratuito y muy rápido
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                instrucciones = (f"Eres un experto en {especialidad}. Basado en este plano "
+                                f"y una escala de {medida_ref}m, genera una tabla con: "
+                                "Pieza, Dimensiones estimadas y Material.")
+                
+                # Gemini recibe la imagen directamente desde la variable
+                response = model.generate_content([instrucciones, archivo_final])
+                
+                st.success("✅ Análisis Finalizado")
                 st.markdown(response.text)
+                
         except Exception as e:
-            st.error(f"Error: {e}")
-            st.info("Si el error persiste, pruebe generar una clave API nueva en un proyecto de Google distinto.")
+            st.error(f"Error técnico: {e}")
+            st.info("Sugerencia: Si el error persiste, reinicie la app desde 'Reboot App' en Streamlit.")
