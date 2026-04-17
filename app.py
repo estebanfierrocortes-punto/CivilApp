@@ -1,10 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
-import os
 
-# CONFIGURACIÓN TÉCNICA PARA EVITAR ERROR 404
-# Forzamos el transporte a 'rest' para máxima compatibilidad
+# Conexión estable forzada
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport='rest')
 else:
