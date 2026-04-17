@@ -3,78 +3,66 @@ import google.generativeai as genai
 from PIL import Image
 from streamlit_paste_button import paste_image_button as pbutton
 
-# Configuración básica de la página
 st.set_page_config(page_title="CIVIL-OS AI", layout="wide")
 
-# Estilo para botones y fondos
-st.markdown("""
-    <style>
-    .stButton>button { border-radius: 10px; width: 100%; height: 50px; background-color: #1E88E5; color: white; font-weight: bold; }
-    .main { background-color: #f0f2f6; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Conexión con la llave API
+# 1. CONFIGURACIÓN DE LA API FORZANDO VERSIÓN ESTABLE
 if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    # Esta línea es la clave: forzamos el uso de la API v1 para evitar el error 404 v1beta
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport='rest')
 else:
-    st.error("🔑 Error: No se encuentra la API Key en los Secrets.")
+    st.error("🔑 No se encontró la clave API en los Secrets.")
 
-st.title("🏗️ CIVIL-OS: Control de Producción")
+st.title("🏗️ CIVIL-OS: Análisis de Obra")
 
-# Panel lateral de ajustes
 with st.sidebar:
-    st.header("⚙️ Ajustes de Obra")
+    st.header("⚙️ Ajustes")
     medida_ref = st.number_input("Escala (m)", value=1.0)
-    especialidad = st.selectbox("Área", ["Ebanistería/Muebles", "Construcción General", "Instalaciones"])
+    tipo = st.selectbox("Especialidad", ["Ebanistería/Cocinas", "Construcción General"])
 
-# Entradas de usuario
+# --- ENTRADAS ---
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("📋 Pegar Pantallazo")
-    resultado_pegar = pbutton("Haga clic y presione Ctrl+V")
+    st.subheader("📋 Opción 1: Pegar")
+    paste_result = pbutton("Clic aquí y Ctrl+V")
 with col2:
-    st.subheader("📂 Cargar Archivo")
-    archivo_cargado = st.file_uploader("Subir imagen o PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
+    st.subheader("📂 Opción 2: Subir")
+    archivo = st.file_uploader("Subir imagen o PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
 
-# Lógica para seleccionar el plano
-plano_final = None
+input_final = None
 es_pdf = False
 
-if resultado_pegar.image_data is not None:
-    plano_final = resultado_pegar.image_data
-    st.image(plano_final, caption="Plano detectado (Pegado)", width=450)
-elif archivo_cargado is not None:
-    if archivo_cargado.type == "application/pdf":
-        plano_final = archivo_cargado.getvalue()
+if paste_result.image_data is not None:
+    input_final = paste_result.image_data
+    st.image(input_final, caption="Imagen para procesar", width=400)
+elif archivo is not None:
+    if archivo.type == "application/pdf":
+        input_final = archivo.getvalue()
         es_pdf = True
-        st.success("✅ PDF cargado.")
+        st.success("✅ PDF listo")
     else:
-        plano_final = Image.open(archivo_cargado)
-        st.image(plano_final, caption="Plano detectado (Cargado)", width=450)
+        input_final = Image.open(archivo)
+        st.image(input_final, caption="Archivo listo", width=400)
 
-# Botón de proceso
-if plano_final:
-    if st.button("🚀 GENERAR LISTADO DE MATERIALES"):
-        try:
-            # CAMBIO CRÍTICO: Usamos la versión más simple del comando
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            with st.spinner("Analizando piezas y medidas..."):
+# --- PROCESAMIENTO ---
+if input_final:
+    if st.button("🚀 INICIAR ANÁLISIS"):
+        # USAMOS EL NOMBRE DEL MODELO SIN PREFIJOS
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        with st.spinner("La IA está calculando..."):
+            try:
                 if es_pdf:
-                    contenido = [{"mime_type": "application/pdf", "data": plano_final}]
+                    contenido = [{"mime_type": "application/pdf", "data": input_final}]
                 else:
-                    contenido = [plano_final]
+                    contenido = [input_final]
                 
-                instruccion = f"Actúa como un Foreman experto en {especialidad}. Escala: {medida_ref}m. Genera una tabla técnica de materiales, m2 y cantidades."
+                prompt = f"Eres Production Manager en Sherbrooke. Escala {medida_ref}m. Genera tabla de materiales para {tipo}."
                 
-                # Ejecución del análisis
-                respuesta = model.generate_content([instruccion] + contenido)
-                
+                # Llamada a la IA
+                response = model.generate_content([prompt] + contenido)
                 st.markdown("---")
-                st.subheader("📋 Resultados del Análisis")
-                st.write(respuesta.text)
+                st.markdown(response.text)
                 
-        except Exception as e:
-            st.error(f"❌ Error de sistema: {e}")
-            st.info("💡 Si el error persiste, por favor crea una llave (API Key) nueva en Google AI Studio.")
+            except Exception as e:
+                st.error(f"Error técnico: {e}")
+                st.info("Si el error 404 persiste, borra el archivo 'requirements.txt' en GitHub y vuelve a crearlo solo con: google-generativeai")
