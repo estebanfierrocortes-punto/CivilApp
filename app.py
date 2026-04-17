@@ -56,10 +56,11 @@ elif archivo_subido is not None:
 # --- BOTÓN DE ACCIÓN ---
 if imagen_para_ia or pdf_para_ia:
     if st.button("🚀 INICIAR ANÁLISIS PROFESIONAL"):
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # HEMOS ACTUALIZADO EL NOMBRE DEL MODELO AQUÍ ABAJO
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         with st.spinner("La IA está calculando materiales y medidas..."):
             try:
-                # Preparamos el contenido exacto para la IA
+                # Preparamos el contenido
                 if pdf_para_ia:
                     contenido = [{"mime_type": "application/pdf", "data": pdf_para_ia}]
                 else:
