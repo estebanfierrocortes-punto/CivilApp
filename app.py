@@ -1,11 +1,19 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+from streamlit_paste_button import paste_image_button as pbutton
 import io
 
 st.set_page_config(page_title="CIVIL-OS AI Chat", layout="wide")
 
-# Configuración de IA
+# Estilo para que parezca un chat de ingeniería
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stButton>button { border-radius: 20px; width: 100%; }
+    </style>
+    """, unsafe_allow_html=True)
+
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
@@ -13,42 +21,33 @@ else:
 
 st.title("🏗️ CIVIL-OS: Inteligencia Artificial Visual")
 
-# Estilo para que parezca una barra de chat real
-st.markdown("""
-    <style>
-    .stTextInput > div > div > input {
-        border: 2px solid #4A90E2 !important;
-        border-radius: 25px !important;
-        padding: 10px 20px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 with st.sidebar:
-    st.header("⚙️ Configuración")
+    st.header("⚙️ Configuración de Obra")
     medida_ref = st.number_input("Medida de referencia (m)", value=1.0)
-    tipo = st.selectbox("Analizar como:", ["Ebanistería", "Estructura Madera", "Plano General"])
+    tipo = st.selectbox("Especialidad", ["Ebanistería/Closets", "Estructura Madera", "Plano Civil"])
 
-st.subheader("💬 Línea de Entrada")
+st.subheader("💬 Línea de Chat (Pega tu plano aquí)")
 
-# 1. LA BARRA DE CHAT (Aquí es donde harás clic y pegarás)
-# Nota: Al pegar una imagen, Streamlit la procesará si el navegador lo permite, 
-# pero lo más seguro es usar el widget de abajo sin hacerle clic profundo.
-pegar_plano = st.file_uploader("HAZ CTRL+V AQUÍ (Sin hacer clic fuerte)", type=['png', 'jpg', 'jpeg'])
+# EL BOTÓN DE PEGADO MÁGICO
+# Este botón lee directamente lo que copiaste con tu pantallazo
+paste_result = pbutton("📋 CLIC AQUÍ PARA PEGAR IMAGEN (Ctrl+V)")
 
-if pegar_plano:
-    st.image(pegar_plano, caption="Plano recibido", width=400)
+if paste_result.image_data is not None:
+    # Mostramos la imagen que acabas de pegar
+    st.image(paste_result.image_data, caption="Imagen pegada correctamente", width=500)
     
-    if st.button("🚀 PROCESAR AHORA"):
+    if st.button("🚀 ANALIZAR AHORA"):
         model = genai.GenerativeModel('gemini-1.5-flash')
-        with st.spinner("La IA está analizando..."):
+        with st.spinner("Analizando materiales para tu fábrica..."):
             try:
-                img = Image.open(pegar_plano)
-                prompt = f"Analiza este plano de {tipo}. Escala: {medida_ref}m. Dame una tabla de materiales y cantidades."
+                # El componente devuelve la imagen lista para la IA
+                img = paste_result.image_data
+                prompt = f"Actúa como un foreman experto en {tipo}. Escala: {medida_ref}m. Dame una tabla detallada de materiales y m2."
+                
                 response = model.generate_content([prompt, img])
                 st.markdown("### 📋 Resultados del Análisis")
                 st.markdown(response.text)
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error técnico: {e}")
 else:
-    st.info("💡 **Para que no se abra la carpeta:** No hagas 'clic' en el botón 'Browse files'. Simplemente pasa el ratón por encima del cuadro punteado y presiona **Ctrl+V**. El navegador detectará que quieres pegar la imagen ahí mismo.")
+    st.info("💡 **Instrucción:** Toma tu pantallazo (Windows + Shift + S), luego haz clic en el botón de arriba y presiona **Ctrl+V**.")
